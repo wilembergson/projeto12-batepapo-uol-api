@@ -1,79 +1,91 @@
 import express from 'express'
 import cors from 'cors'
 import { MongoClient } from "mongodb"
+import dayjs from 'dayjs'
+import Joi from 'joi'
 import dotenv from 'dotenv'
 dotenv.config()
-import dayjs from 'dayjs'
 
 const app = express()
 app.use(express.json())
 app.use(cors())
 
 //CRIANDO CONEXÃO COM O BANCO
+let database = null
 const mongoClient = new MongoClient(process.env.MONGO_URI)
+const promise = mongoClient.connect()
+promise.then(()=> database = mongoClient.db(process.env.BANCO_MONGO))
+promise.catch(e => console.log("Algo deu errado."))
 
 //OBTER LISTA DE PARTICIPANTES
-app.get("/participants", async (req, res) => {
+app.get("/participants", (req, res) => {
     try{
-        await mongoClient.connect()
-        const db = mongoClient.db(process.env.BANCO_MONGO)
-        const participantsColection = db.collection('participants')
-
-        await participantsColection.find().toArray().then(participants =>{
-            res.send(participants)
-        })
-        mongoClient.close()
-    }catch{
-        res.sendStatus(409)
-    }
-});
-
-//OBTER MENSSAGENS
-app.get("/messages", async (req, res) => {
-    try{
-        await mongoClient.connect()
-        const db = mongoClient.db(process.env.BANCO_MONGO)
-        const messagesColection = db.collection('mesageteste')
-
-        await messagesColection.find().toArray().then(messages =>{
-            res.send(messages)
-        })
-        mongoClient.close()
+        const participantsColection = database.collection('participants')
+        const promise = participantsColection.find().toArray()
+        promise.then(participants => res.send(participants))
     }catch{
         res.sendStatus(409)
     }
 });
 
 //SALVAR UM PARTICIPANTE
-app.post("/participants", async (req, res)=>{
+app.post("/participants", (req, res)=>{
+    const participantSchema = Joi.object({
+        name: Joi.string().required()
+    })
+    const validation = participantSchema.validate(req.body, {abortEarly: true})
+    if(validation.error){
+        res.sendStatus(422)
+        return
+    }
+    
+    ///////////O RETURN NÃO FUNCIONA E A APLICAÇÃO PARA///////////////////
+    const participantsColection = database.collection('participants')
+    const promise1 = participantsColection.findOne({name:req.body.name})
+    promise1.then(obj => {
+        if(obj !== null){
+            res.sendStatus(409)
+            return
+        }    
+    })
+    promise1.catch(e=> console.log("Erro."))
+    ////////////////////////////////////////////////////////////////////
+
     try{
-        await mongoClient.connect()
-        const db = mongoClient.db(process.env.BANCO_MONGO)
-        const participantsColection = db.collection('participants')
-        
         const newParcipant = {
             name: req.body.name,
             lastStatus: Date.now()
         }
-        await participantsColection.insertOne(newParcipant)
-
-        //SALVANDO MENSSAGEM
-        const mesageColection = db.collection('mesageteste')
-        const newmesage = {
-            from: req.body.name,
-            to: 'Todos',
-            text: 'entra na sala...',
-            type: 'status',
-            time: getTime()
-        }
-        await mesageColection.insertOne(newmesage)
-
-        res.sendStatus(201)
-        mongoClient.close()
+        const promise = participantsColection.insertOne(newParcipant)
+        promise.then(()=>{
+            //SALVANDO MENSSAGEM
+            const mesageColection = database.collection('mesageteste')
+            const newmesage = {
+                from: req.body.name,
+                to: 'Todos',
+                text: 'entra na sala...',
+                type: 'status',
+                time: getTime()
+            }
+            const promise = mesageColection.insertOne(newmesage)
+            promise.then(res.sendStatus(201))
+        })
+        
     }catch{
         res.sendStatus(409)
     }
 })
+
+//OBTER MENSSAGENS
+app.get("/messages", (req, res) => {
+    try{
+        const messagesColection = database.collection('mesageteste')
+        const promise = messagesColection.find().toArray()
+        promise.then(messages =>res.send(messages))
+    }catch{
+        res.sendStatus(409)
+    }
+});
 
 //OBTER A HORA NO MOMENTO
 function getTime(){
@@ -94,5 +106,5 @@ function getTime(){
 }
 
 app.listen(5000, ()=>{
-    console.log(getTime())
+    console.log("Running...")
 })
