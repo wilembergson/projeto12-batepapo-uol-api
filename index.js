@@ -29,7 +29,7 @@ app.get("/participants", (req, res) => {
 });
 
 //SALVAR UM PARTICIPANTE
-app.post("/participants", (req, res)=>{
+app.post("/participants", async (req, res)=>{
     const participantSchema = Joi.object({
         name: Joi.string().required()
     })
@@ -39,17 +39,14 @@ app.post("/participants", (req, res)=>{
         return
     }
     
-    ///////////O RETURN NÃO FUNCIONA E A APLICAÇÃO PARA///////////////////
+    //CHECAR SE PARTICIPANTE JÁ EXISTE
+    const name = req.body.name
     const participantsColection = database.collection('participants')
-    const promise1 = participantsColection.findOne({name:req.body.name})
-    promise1.then(obj => {
-        if(obj !== null){
-            res.sendStatus(409)
-            return
-        }    
-    })
-    promise1.catch(e=> console.log("Erro."))
-    ////////////////////////////////////////////////////////////////////
+    const promise1 = await participantsColection.findOne({name:name})
+    if(promise1){
+        res.status(409).send()
+        return
+    }
 
     try{
         const newParcipant = {
