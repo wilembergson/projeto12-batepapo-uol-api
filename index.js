@@ -91,7 +91,7 @@ app.post("/messages", async (req, res)=>{
     }
     const existUser = await database.collection('participants').findOne({name: user})
     if(!existUser){
-        res.status(422).send() 
+        res.status(422).send()
         return
     }
     try{
@@ -112,6 +112,11 @@ app.post("/messages", async (req, res)=>{
 //OBTER MENSSAGENS
 app.get("/messages", async (req, res) => {
     const user = req.header('user')
+    const participant =  await database.collection('participants').findOne({name: user})
+    if(!participant){
+        res.sendStatus(404)
+        return
+    }
     try{
         const messages = await database.collection('messages').find().toArray()
         const limit = parseInt(req.query.limit) || messages.length
@@ -126,6 +131,22 @@ app.get("/messages", async (req, res) => {
         res.sendStatus(409)
     }
 });
+
+//ATUALIZAR STATUS
+app.post("/status", async (req, res)=>{
+    const user = req.header('user')
+    const participant =  await database.collection('participants').findOne({name: user})
+    if(!participant){
+        res.sendStatus(404)
+        return
+    }
+    try{
+        await database.collection('participants').updateOne({name:user}, { $set: { lastStatus: Date.now()}})
+        res.sendStatus(200)
+    }catch(e){
+        res.status(404).send(e)
+    }
+})
 
 //OBTER A HORA NO MOMENTO
 function getTime(){
