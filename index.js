@@ -42,8 +42,8 @@ app.post("/participants", async (req, res)=>{
     //CHECAR SE PARTICIPANTE JÁ EXISTE
     const name = req.body.name
     const participantsColection = database.collection('participants')
-    const promise1 = await participantsColection.findOne({name:name})
-    if(promise1){
+    const existName = await participantsColection.findOne({name:name})
+    if(existName){
         res.status(409).send()
         return
     }
@@ -56,7 +56,7 @@ app.post("/participants", async (req, res)=>{
         const promise = participantsColection.insertOne(newParcipant)
         promise.then(()=>{
             //SALVANDO MENSSAGEM
-            const mesageColection = database.collection('mesageteste')
+            const messageColection = database.collection('mesageteste')
             const newmesage = {
                 from: req.body.name,
                 to: 'Todos',
@@ -64,10 +64,48 @@ app.post("/participants", async (req, res)=>{
                 type: 'status',
                 time: getTime()
             }
-            const promise = mesageColection.insertOne(newmesage)
+            const promise = messageColection.insertOne(newmesage)
             promise.then(res.sendStatus(201))
         })
         
+    }catch{
+        res.sendStatus(409)
+    }
+})
+
+//SALVAR MENSSAGEM
+app.post("/messages", async (req, res)=>{
+    const body = req.body
+    const user = req.header("user")
+
+    const messageSchema = Joi.object({
+        to: Joi.string().required(),
+        text: Joi.string().required(),
+        type: Joi.string().valid('message','private_message').required(),
+        from: Joi.required()
+    })
+    const validation = messageSchema.validate({...body, from:user}, {abortEarly: true})
+    if(validation.error){
+        res.sendStatus(422)
+        return
+    }
+
+    const existUser = await database.collection('participants').findOne({name: user})
+    if(!existUser){
+        res.status(422).send() 
+        return
+    }
+
+    try{
+        const newMessage = {
+            from: user,
+            to: body.to,
+            text: body.text,
+            type: body.type,
+            time: getTime()
+        }
+        await database.collection('mesageteste').insertOne(newMessage)
+        res.sendStatus(201)
     }catch{
         res.sendStatus(409)
     }
