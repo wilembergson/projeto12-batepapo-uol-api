@@ -56,7 +56,7 @@ app.post("/participants", async (req, res)=>{
         const promise = participantsColection.insertOne(newParcipant)
         promise.then(()=>{
             //SALVANDO MENSSAGEM
-            const messageColection = database.collection('mesageteste')
+            const messageColection = database.collection('messages')
             const newmesage = {
                 from: req.body.name,
                 to: 'Todos',
@@ -89,13 +89,11 @@ app.post("/messages", async (req, res)=>{
         res.sendStatus(422)
         return
     }
-
     const existUser = await database.collection('participants').findOne({name: user})
     if(!existUser){
         res.status(422).send() 
         return
     }
-
     try{
         const newMessage = {
             from: user,
@@ -104,7 +102,7 @@ app.post("/messages", async (req, res)=>{
             type: body.type,
             time: getTime()
         }
-        await database.collection('mesageteste').insertOne(newMessage)
+        await database.collection('messages').insertOne(newMessage)
         res.sendStatus(201)
     }catch{
         res.sendStatus(409)
@@ -112,11 +110,18 @@ app.post("/messages", async (req, res)=>{
 })
 
 //OBTER MENSSAGENS
-app.get("/messages", (req, res) => {
+app.get("/messages", async (req, res) => {
+    const user = req.header('user')
     try{
-        const messagesColection = database.collection('mesageteste')
-        const promise = messagesColection.find().toArray()
-        promise.then(messages =>res.send(messages))
+        const messages = await database.collection('messages').find().toArray()
+        const limit = parseInt(req.query.limit) || messages.length
+        const lastMessages = messages
+                            .reverse()
+                            .slice(0, limit)
+                            .filter(msg=>{
+                                return (msg.from === user || msg.to === user || msg.to === 'Todos')
+                            })
+        res.send(lastMessages)
     }catch{
         res.sendStatus(409)
     }
