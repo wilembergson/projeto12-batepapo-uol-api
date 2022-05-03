@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import { MongoClient } from "mongodb"
+import { MongoClient, ObjectId } from "mongodb"
 import dayjs from 'dayjs'
 import Joi from 'joi'
 import dotenv from 'dotenv'
@@ -192,6 +192,52 @@ async function removeInactives(){
         console.log(err)
     }
 }
+
+//DELETAR MENSSAGEM
+app.delete("/messages/:messageID", async (req, res)=>{
+    const messageID = req.params.messageID
+    const user = req.header("User")
+
+    const messageSchema = Joi.object({
+        id: Joi.string().required()
+    })
+    const messageValidation = messageSchema.validate({id:messageID}, {abortEarly: true})
+    if(messageValidation.error){
+        res.sendStatus(404)
+        return
+    }
+    const userSchema = Joi.object({
+        user: Joi.string().required()
+    })
+    const userValidation = userSchema.validate({user}, {abortEarly: true})
+    if(userValidation.error){
+        res.sendStatus(404)
+        return
+    }
+   
+    try{
+        const message = await database.collection("messages").findOne({_id: new ObjectId(messageID)})
+        console.log(message)
+        if(!message){
+            res.sendStatus(404)
+            return
+        }
+        if(message.from !== user){
+            res.sendStatus(401)
+            return
+        }
+        try{
+            await database.collection("messages").deleteOne({ _id: new ObjectId(messageID) })
+        }catch{
+            res.sendStatus(400)
+        }
+        res.sendStatus(200)
+    }catch{
+        res.sendStatus(500)
+    }
+    
+    
+})
 
 setInterval(removeInactives, 15000)
 
