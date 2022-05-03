@@ -166,6 +166,35 @@ function getTime(){
     return `${hh}:${mm}:${ss}`
 }
 
+//REMOVE PARTICIPANTES INATIVOS
+async function removeInactives(){
+    const inactiveTime = Date.now() - 10000
+    try{
+        const usersToRemove = await database.collection('participants').find({lastStatus: {$lt: inactiveTime}}).toArray()
+        if(usersToRemove.length === 0){
+            return
+        }
+        await database.collection('participants').deleteMany({lastStatus: {$lt: inactiveTime}})
+        for(let i=0; i<usersToRemove.length; i++){
+            try{
+                await database.collection('messages').insertOne({
+                    from: usersToRemove[i].name,
+                    to: 'Todos',
+                    text: 'sai da sala...',
+                    type: 'status',
+                    time: getTime()
+                }) 
+            }catch(err){
+                console.log(err)
+            }
+        }
+    }catch(err){
+        console.log(err)
+    }
+}
+
+setInterval(removeInactives, 15000)
+
 app.listen(5000, ()=>{
     console.log("Running...")
 })
